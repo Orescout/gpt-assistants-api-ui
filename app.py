@@ -13,6 +13,11 @@ import streamlit_authenticator as stauth
 
 load_dotenv()
 
+st.set_page_config(
+    page_title="AI Expert",  # Replace with your desired page title
+    page_icon="favicon.ico",  # Replace with the path to your favicon
+)
+
 def hide_streamlit_elements():
     hide_streamlit_style = """
         <style>
@@ -22,6 +27,8 @@ def hide_streamlit_elements():
         </style>
     """
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+hide_streamlit_elements()  # Add this line to hide Streamlit elements
 
 def str_to_bool(str_input):
     if not isinstance(str_input, str):
@@ -315,7 +322,7 @@ def load_chat_screen(assistant_id, assistant_title):
 
     st.title(assistant_title if assistant_title else "")
     st.markdown("Looking for super-trustworthy answers to your concussion question?")
-    st.markdown("Our AI has learned from the vast published literature on concussions and can answer anything. We link everything back to evidence-based research. Ask away!")
+    st.markdown("Our AI has studied the vast peer-reviewed literature on concussions and can answer anything. We link everything back to evidence-based research. Ask away!")
 
     user_msg = st.chat_input(
         "What's your question?", on_submit=disable_form, disabled=st.session_state.in_progress
@@ -343,16 +350,16 @@ def load_chat_screen(assistant_id, assistant_title):
     if st.session_state.get("first_question_asked"):
         st.markdown("""
             <div style='text-align: left; color: grey'>
-                <a href="https://www.neuromendhealth.com/ask-a-question" >Get next-hour answer from a concussion specialist</a>
+                <a href="https://www.neuromendhealth.com/ask-a-question" >Get next-hour answer from a human expert</a>
                 <br>
-                <a href="https://www.neuromendhealth.com/filters" >Book a next-day appointment with a concussion specialist</a>
+                <a href="https://www.neuromendhealth.com/filters" >Book a next-day appointment with a specialist</a>
             </div>
             """, unsafe_allow_html=True)
     
 
 
 def main():
-    hide_streamlit_elements()  # Add this line to hide Streamlit elements
+    
     
     # Check if multi-agent settings are defined
     multi_agents = os.environ.get("OPENAI_ASSISTANTS", None)
