@@ -168,7 +168,6 @@ def create_message(thread, content, file):
     if file is not None:
         attachments.append(
             {"file_id": file.id, "tools": [{"type": "code_interpreter"}, {"type": "file_search"}]}
-            {"file_id": file.id, "tools": [{"type": "code_interpreter"}, {"type": "file_search"}]}
         )
     client.beta.threads.messages.create(
         thread_id=thread.id, role="user", content=content, attachments=attachments
@@ -284,7 +283,6 @@ def load_chat_screen(assistant_id, assistant_title):
     st.title(assistant_title if assistant_title else "")
     user_msg = st.chat_input(
         "What's your question?", on_submit=disable_form, disabled=st.session_state.in_progress
-        "What's your question?", on_submit=disable_form, disabled=st.session_state.in_progress
     )
     if user_msg:
         render_chat()
@@ -367,15 +365,12 @@ def main():
     if user_query and not st.session_state.query_processed:
         st.session_state.chat_log.append({"name": "user", "msg": user_query})
         render_chat()
-        # with st.chat_message("user"):
-        #     st.markdown(user_query, True)
         
         file = None
         run_stream(user_query, file, single_agent_id)
         st.session_state.in_progress = False
         st.session_state.tool_call = None
         st.session_state.query_processed = True
-        # st.rerun()
 
 
 if __name__ == "__main__":
