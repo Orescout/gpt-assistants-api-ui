@@ -25,6 +25,7 @@ openai_api_key = os.environ.get("OPENAI_API_KEY")
 instructions = os.environ.get("RUN_INSTRUCTIONS", "")
 enabled_file_upload_message = os.environ.get(
     "ENABLED_FILE_UPLOAD_MESSAGE"
+    "ENABLED_FILE_UPLOAD_MESSAGE"
 )
 azure_openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
 azure_openai_key = os.environ.get("AZURE_OPENAI_KEY")
@@ -159,12 +160,14 @@ class EventHandler(AssistantEventHandler):
 
 def create_thread(content, file):
     return client.beta.threads.create()
+    return client.beta.threads.create()
 
 
 def create_message(thread, content, file):
     attachments = []
     if file is not None:
         attachments.append(
+            {"file_id": file.id, "tools": [{"type": "code_interpreter"}, {"type": "file_search"}]}
             {"file_id": file.id, "tools": [{"type": "code_interpreter"}, {"type": "file_search"}]}
         )
     client.beta.threads.messages.create(
@@ -237,6 +240,10 @@ if "query_processed" not in st.session_state:
     st.session_state.query_processed = False
     
 
+if "query_processed" not in st.session_state:
+    st.session_state.query_processed = False
+    
+
 def disable_form():
     st.session_state.in_progress = True
 
@@ -277,6 +284,7 @@ def load_chat_screen(assistant_id, assistant_title):
     st.title(assistant_title if assistant_title else "")
     user_msg = st.chat_input(
         "What's your question?", on_submit=disable_form, disabled=st.session_state.in_progress
+        "What's your question?", on_submit=disable_form, disabled=st.session_state.in_progress
     )
     if user_msg:
         render_chat()
@@ -304,6 +312,10 @@ def main():
     # Check for query parameters
     query_params = st.query_params
     user_query = query_params.query if "query" in query_params else "hola"
+    
+    # Check for query parameters
+    query_params = st.query_params
+    user_query = query_params.query if "query" in query_params else ""
 
     if (
         authentication_required
@@ -336,6 +348,20 @@ def main():
         load_chat_screen(single_agent_id, single_agent_title)
     else:
         st.error("No assistant configurations defined in environment variables.")
+        
+    # Automatically send the user query as the first message
+    if user_query and not st.session_state.query_processed:
+        st.session_state.chat_log.append({"name": "user", "msg": user_query})
+        render_chat()
+        # with st.chat_message("user"):
+        #     st.markdown(user_query, True)
+        
+        file = None
+        run_stream(user_query, file, single_agent_id)
+        st.session_state.in_progress = False
+        st.session_state.tool_call = None
+        st.session_state.query_processed = True
+        # st.rerun()
         
     # Automatically send the user query as the first message
     if user_query and not st.session_state.query_processed:
