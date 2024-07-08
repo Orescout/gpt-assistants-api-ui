@@ -268,7 +268,9 @@ if "in_progress" not in st.session_state:
 
 if "query_processed" not in st.session_state:
     st.session_state.query_processed = False
-    
+
+if "first_question_asked" not in st.session_state:
+    st.session_state.first_question_asked = False
 
 if "query_processed" not in st.session_state:
     st.session_state.query_processed = False
@@ -312,14 +314,19 @@ def load_chat_screen(assistant_id, assistant_title):
         uploaded_file = None
 
     st.title(assistant_title if assistant_title else "")
+    st.markdown("Looking for super-trustworthy answers to your concussion question?")
+    st.markdown("Our AI has learned from the vast published literature on concussions and can answer anything. We link everything back to evidence-based research. Ask away!")
+
     user_msg = st.chat_input(
         "What's your question?", on_submit=disable_form, disabled=st.session_state.in_progress
     )
+        
     if user_msg:
         render_chat()
         with st.chat_message("user"):
             st.markdown(user_msg, True)
         st.session_state.chat_log.append({"name": "user", "msg": user_msg})
+        
 
         file = None
         if uploaded_file is not None:
@@ -327,9 +334,21 @@ def load_chat_screen(assistant_id, assistant_title):
         run_stream(user_msg, file, assistant_id)
         st.session_state.in_progress = False
         st.session_state.tool_call = None
+        st.session_state.first_question_asked = True  # Set the state variable
         st.rerun()
-
+        
     render_chat()
+    
+    # Conditionally display the markdown
+    if st.session_state.get("first_question_asked"):
+        st.markdown("""
+            <div style='text-align: left; color: grey'>
+                <a href="https://www.neuromendhealth.com/ask-a-question" >Get next-hour answer from a concussion specialist</a>
+                <br>
+                <a href="https://www.neuromendhealth.com/filters" >Book a next-day appointment with a concussion specialist</a>
+            </div>
+            """, unsafe_allow_html=True)
+    
 
 
 def main():
