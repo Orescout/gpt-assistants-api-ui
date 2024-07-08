@@ -1,5 +1,5 @@
-fastapi
-uvicorn
-python-dotenv
+streamlit
 openai
-jinja2
+python-dotenv
+streamlit-authenticator
+typing-extensions
