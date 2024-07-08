@@ -13,6 +13,15 @@ import streamlit_authenticator as stauth
 
 load_dotenv()
 
+def hide_streamlit_elements():
+    hide_streamlit_style = """
+        <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        </style>
+    """
+    st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 def str_to_bool(str_input):
     if not isinstance(str_input, str):
@@ -302,6 +311,8 @@ def load_chat_screen(assistant_id, assistant_title):
 
 
 def main():
+    hide_streamlit_elements()  # Add this line to hide Streamlit elements
+    
     # Check if multi-agent settings are defined
     multi_agents = os.environ.get("OPENAI_ASSISTANTS", None)
     single_agent_id = os.environ.get("ASSISTANT_ID", None)
