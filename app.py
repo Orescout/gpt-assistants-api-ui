@@ -350,7 +350,7 @@ def load_chat_screen(assistant_id, assistant_title):
     if st.session_state.get("first_question_asked"):
         st.markdown("""
             <div style='text-align: left; color: grey'>
-                <a href="https://www.neuromendhealth.com/ask-a-question" >Get next-hour answer from a human expert</a>
+                <a href="https://www.neuromendhealth.com/expert-answer" >Get next-hour answer from a human expert</a>
                 <br>
                 <a href="https://www.neuromendhealth.com/filters" >Book a next-day appointment with a specialist</a>
             </div>
