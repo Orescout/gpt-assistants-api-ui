@@ -10,6 +10,17 @@ from tools import TOOL_MAP
 from typing_extensions import override
 from dotenv import load_dotenv
 import streamlit_authenticator as stauth
+import json
+
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
+import streamlit.components.v1 as components
+from streamlit.components.v1 import html
+# import streamlit_cookies_manager as cookies_manager
+import uuid
+from streamlit_javascript import st_javascript
+from streamlit_js_eval import streamlit_js_eval
 
 load_dotenv()
 
@@ -17,6 +28,13 @@ st.set_page_config(
     page_title="AI Expert",  # Replace with your desired page title
     page_icon="favicon.ico",  # Replace with the path to your favicon
 )
+
+# Google Sheets setup
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+client_gs = gspread.authorize(creds)
+# FYI: I needed to share the Google Sheet with the client email in credentials.json
+sheet = client_gs.open("ai_concussion_expert_v1_log").get_worksheet(0)
 
 def hide_streamlit_elements():
     hide_streamlit_style = """
@@ -29,12 +47,15 @@ def hide_streamlit_elements():
     st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 hide_streamlit_elements()  # Add this line to hide Streamlit elements
-
+    
+def log_interaction(user_id, event_type, data):
+    timestamp = datetime.now().isoformat()
+    sheet.append_row([timestamp, user_id, event_type, data])
+    
 def str_to_bool(str_input):
     if not isinstance(str_input, str):
         return False
     return str_input.lower() == "true"
-
 
 # Load environment variables
 openai_api_key = os.environ.get("OPENAI_API_KEY")
@@ -59,6 +80,13 @@ if authentication_required:
     else:
         authenticator = None  # No authentication should be performed
 
+def get_session_id():
+    if 'user_id' not in st.session_state:
+        st.session_state.user_id = str(uuid.uuid4())
+    return st.session_state.user_id
+
+st.session_state.user_id = get_session_id()
+    
 client = None
 if azure_openai_endpoint and azure_openai_key:
     client = openai.AzureOpenAI(
@@ -94,11 +122,12 @@ class EventHandler(AssistantEventHandler):
 
     @override
     def on_text_done(self, text):
-        format_text = format_annotation(text)
+        format_text = format_annotation_new(text)
         # format_text = text.value
         st.session_state.current_markdown.markdown(format_text, True)
         st.session_state.chat_log.append({"name": "assistant", "msg": format_text})
-
+        log_interaction(st.session_state.user_id, "response", format_text)
+        
     @override
     def on_tool_call_created(self, tool_call):
         if tool_call.type == "code_interpreter":
@@ -177,7 +206,6 @@ class EventHandler(AssistantEventHandler):
 
 def create_thread(content, file):
     return client.beta.threads.create()
-    return client.beta.threads.create()
 
 
 def create_message(thread, content, file):
@@ -238,6 +266,19 @@ def format_annotation(text):
             )
             text_value = re.sub(r"\[(.*?)\]\s*\(\s*(.*?)\s*\)", link_tag, text_value)
     text_value += "\n\n" + "\n".join(citations)
+    return text_value
+
+def format_annotation_new(text):
+    text_value = text.value
+    for index, annotation in enumerate(text.annotations):
+        if file_citation := getattr(annotation, "file_citation", None):
+            cited_file = client.files.retrieve(file_citation.file_id)
+            file_url = cited_file.filename.split('.txt')[0].replace('_', '/')
+            citation_text = f" [[{index + 1}]({file_url})]"
+        elif file_path := getattr(annotation, "file_path", None):
+            file_url = annotation.text.split('.txt')[0].replace('_', '/')
+            citation_text = f" [[{index + 1}]({file_url})]"
+        text_value = text_value.replace(annotation.text, citation_text)
     return text_value
 
 
@@ -333,7 +374,7 @@ def load_chat_screen(assistant_id, assistant_title):
         with st.chat_message("user"):
             st.markdown(user_msg, True)
         st.session_state.chat_log.append({"name": "user", "msg": user_msg})
-        
+        log_interaction(st.session_state.user_id, "query", user_msg)  
 
         file = None
         if uploaded_file is not None:
@@ -347,29 +388,23 @@ def load_chat_screen(assistant_id, assistant_title):
     render_chat()
     
     # Conditionally display the markdown
-    if st.session_state.get("first_question_asked"):
-        st.markdown("""
-            <div style='text-align: left; color: grey'>
-                <a href="https://www.neuromendhealth.com/expert-answer" >Get next-hour answer from a human expert</a>
-                <br>
-                <a href="https://www.neuromendhealth.com/filters" >Book a next-day appointment with a specialist</a>
-            </div>
-            """, unsafe_allow_html=True)
-    
-
+    # if st.session_state.first_question_asked:
+    #     user_id = st.session_state.get("user_id", "")
+    #     st.markdown(f"""
+    #         <div style='text-align: left; color: grey'>
+    #             <a href="https://www.neuromendhealth.com/expert-answer?user_id={user_id}" >Get next-hour answer from our clinicians</a>
+    #             <br>
+    #             <a href="https://www.neuromendhealth.com/filters?user_id={user_id}" >Book a next-day appointment with a specialist</a>
+    #         </div>
+    #         """, unsafe_allow_html=True)
 
 def main():
-    
     
     # Check if multi-agent settings are defined
     multi_agents = os.environ.get("OPENAI_ASSISTANTS", None)
     single_agent_id = os.environ.get("ASSISTANT_ID", None)
     single_agent_title = os.environ.get("ASSISTANT_TITLE", "Assistants API UI")
-    
-    # Check for query parameters
-    query_params = st.query_params
-    user_query = query_params.query if "query" in query_params else "hola"
-    
+        
     # Check for query parameters
     query_params = st.query_params
     user_query = query_params.query if "query" in query_params else ""
@@ -386,29 +421,32 @@ def main():
         else:
             authenticator.logout(location="sidebar")
 
-    if multi_agents:
-        assistants_json = json.loads(multi_agents)
-        assistants_object = {f'{obj["title"]}': obj for obj in assistants_json}
-        selected_assistant = st.sidebar.selectbox(
-            "Select an assistant profile?",
-            list(assistants_object.keys()),
-            index=None,
-            placeholder="Select an assistant profile...",
-            on_change=reset_chat,  # Call the reset function on change
-        )
-        if selected_assistant:
-            load_chat_screen(
-                assistants_object[selected_assistant]["id"],
-                assistants_object[selected_assistant]["title"],
-            )
-    elif single_agent_id:
-        load_chat_screen(single_agent_id, single_agent_title)
-    else:
-        st.error("No assistant configurations defined in environment variables.")
-        
+    # if multi_agents:
+    #     assistants_json = json.loads(multi_agents)
+    #     assistants_object = {f'{obj["title"]}': obj for obj in assistants_json}
+    #     selected_assistant = st.sidebar.selectbox(
+    #         "Select an assistant profile?",
+    #         list(assistants_object.keys()),
+    #         index=None,
+    #         placeholder="Select an assistant profile...",
+    #         on_change=reset_chat,  # Call the reset function on change
+    #     )
+    #     if selected_assistant:
+    #         load_chat_screen(
+    #             assistants_object[selected_assistant]["id"],
+    #             assistants_object[selected_assistant]["title"],
+    #         )
+    # elif single_agent_id:
+    #     load_chat_screen(single_agent_id, single_agent_title)
+    # else:
+    #     st.error("No assistant configurations defined in environment variables.")
+    
+    load_chat_screen(single_agent_id, single_agent_title)
+    
     # Automatically send the user query as the first message
     if user_query and not st.session_state.query_processed:
         st.session_state.chat_log.append({"name": "user", "msg": user_query})
+        log_interaction(st.session_state.user_id, "query", user_query)
         render_chat()
         # with st.chat_message("user"):
         #     st.markdown(user_query, True)
@@ -419,17 +457,27 @@ def main():
         st.session_state.tool_call = None
         st.session_state.query_processed = True
         # st.rerun()
+    
+    if st.session_state.first_question_asked or st.session_state.query_processed:
+        user_id = st.session_state.get("user_id", "")
+        st.markdown(f"""
+            <div style='text-align: left; color: grey'>
+                <a href="https://www.neuromendhealth.com/expert-answer?user_id={user_id}" >Get next-hour answer from our clinicians</a>
+                <br>
+                <a href="https://www.neuromendhealth.com/filters?user_id={user_id}" >Book a next-day appointment with a specialist</a>
+            </div>
+            """, unsafe_allow_html=True)
         
-    # Automatically send the user query as the first message
-    if user_query and not st.session_state.query_processed:
-        st.session_state.chat_log.append({"name": "user", "msg": user_query})
-        render_chat()
+    # # Automatically send the user query as the first message
+    # if user_query and not st.session_state.query_processed:
+    #     st.session_state.chat_log.append({"name": "user", "msg": user_query}) 
+    #     render_chat()
         
-        file = None
-        run_stream(user_query, file, single_agent_id)
-        st.session_state.in_progress = False
-        st.session_state.tool_call = None
-        st.session_state.query_processed = True
+    #     file = None
+    #     run_stream(user_query, file, single_agent_id)
+    #     st.session_state.in_progress = False
+    #     st.session_state.tool_call = None
+    #     st.session_state.query_processed = True
 
 
 if __name__ == "__main__":

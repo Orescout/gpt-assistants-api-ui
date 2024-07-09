@@ -3,3 +3,8 @@ openai
 python-dotenv
 streamlit-authenticator
 typing-extensions
+gspread
+oauth2client
+streamlit-cookies-manager
+streamlit_javascript
+streamlit_js_eval
