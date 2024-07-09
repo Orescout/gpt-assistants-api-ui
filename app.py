@@ -457,8 +457,6 @@ def main():
         st.session_state.chat_log.append({"name": "user", "msg": user_query})
         log_interaction(st.session_state.user_id, "query", user_query)
         render_chat()
-        # with st.chat_message("user"):
-        #     st.markdown(user_query, True)
         
         file = None
         run_stream(user_query, file, single_agent_id)
