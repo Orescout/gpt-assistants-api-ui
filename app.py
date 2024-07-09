@@ -21,20 +21,26 @@ from streamlit.components.v1 import html
 import uuid
 from streamlit_javascript import st_javascript
 from streamlit_js_eval import streamlit_js_eval
+import os
+import json
+from dotenv import load_dotenv
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
+# Load the .env file
 load_dotenv()
+
+creds_json = os.getenv('GOOGLE_SHEETS_CREDENTIALS')
+creds_dict = json.loads(creds_json)
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client_gs = gspread.authorize(creds)
+sheet = client_gs.open("ai_concussion_expert_v1_log").get_worksheet(0)
 
 st.set_page_config(
     page_title="AI Expert",  # Replace with your desired page title
     page_icon="favicon.ico",  # Replace with the path to your favicon
 )
-
-# Google Sheets setup
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-client_gs = gspread.authorize(creds)
-# FYI: I needed to share the Google Sheet with the client email in credentials.json
-sheet = client_gs.open("ai_concussion_expert_v1_log").get_worksheet(0)
 
 def hide_streamlit_elements():
     hide_streamlit_style = """
@@ -365,6 +371,9 @@ def load_chat_screen(assistant_id, assistant_title):
     st.markdown("Looking for super-trustworthy answers to your concussion question?")
     st.markdown("Our AI has studied the vast peer-reviewed literature on concussions and can answer anything. We link everything back to evidence-based research. Ask away!")
 
+    # Log when the user opens the chat
+    log_interaction(st.session_state.user_id, "session_started", "___")
+    
     user_msg = st.chat_input(
         "What's your question?", on_submit=disable_form, disabled=st.session_state.in_progress
     )
